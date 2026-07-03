@@ -47,31 +47,29 @@ Este repositorio describe plantillas estándar y mejores prácticas para garanti
 Utilice esta plantilla para actualizar registros de forma segura con un modo de vista previa de simulación integrado.
 
 ```javascript
-(function() {
-    var dryRun = true; // Establecer en false para aplicar los cambios
-    var targetTable = 'incident';
-    var encodedQuery = 'active=true^state=3'; // Incidentes en espera (On Hold)
-    
-    var gr = new GlideRecord(targetTable);
-    gr.addEncodedQuery(encodedQuery);
-    gr.query();
-    
-    var count = 0;
-    gs.info('Iniciando Fix Script. Dry Run: ' + dryRun);
-    
-    while (gr.next()) {
-        count++;
-        if (!dryRun) {
-            gr.setWorkflow(false);
-            gr.autoSysFields(false);
-            gr.work_notes = "Mantenimiento del sistema: Actualización de comentarios en espera.";
-            gr.update();
-        } else {
-            gs.info('[DRY RUN] Actualizaría el incidente: ' + gr.number);
-        }
+var dryRun = true; // Establecer en false para aplicar los cambios
+var targetTable = 'incident';
+var encodedQuery = 'active=true^state=3'; // Incidentes en espera (On Hold)
+
+var gr = new GlideRecord(targetTable);
+gr.addEncodedQuery(encodedQuery);
+gr.query();
+
+var count = 0;
+gs.info('Iniciando Fix Script. Dry Run: ' + dryRun);
+
+while (gr.next()) {
+    count++;
+    if (!dryRun) {
+        gr.setWorkflow(false);
+        gr.autoSysFields(false);
+        gr.work_notes = "Mantenimiento del sistema: Actualización de comentarios en espera.";
+        gr.update();
+    } else {
+        gs.info('[DRY RUN] Actualizaría el incidente: ' + gr.number);
     }
-    gs.info('Ejecución completada. Registros afectados: ' + count);
-})();
+}
+gs.info('Ejecución completada. Registros afectados: ' + count);
 ```
 
 ---
@@ -81,44 +79,42 @@ Utilice esta plantilla para actualizar registros de forma segura con un modo de 
 Para conjuntos de datos grandes, utilice este bucle para consultar y actualizar registros en lotes, evitando errores de memoria y tiempos de espera de transacciones.
 
 ```javascript
-(function() {
-    var BATCH_SIZE = 5000;
-    var targetTable = 'u_custom_data';
-    var encodedQuery = 'u_processed=false';
+var BATCH_SIZE = 5000;
+var targetTable = 'u_custom_data';
+var encodedQuery = 'u_processed=false';
+
+var recordsLeft = true;
+var totalUpdated = 0;
+
+while (recordsLeft) {
+    var gr = new GlideRecord(targetTable);
+    gr.addEncodedQuery(encodedQuery);
+    gr.setLimit(BATCH_SIZE);
+    gr.query();
     
-    var recordsLeft = true;
-    var totalUpdated = 0;
-    
-    while (recordsLeft) {
-        var gr = new GlideRecord(targetTable);
-        gr.addEncodedQuery(encodedQuery);
-        gr.setLimit(BATCH_SIZE);
-        gr.query();
-        
-        var batchCount = 0;
-        if (!gr.hasNext()) {
-            recordsLeft = false;
-            break;
-        }
-        
-        while (gr.next()) {
-            gr.setWorkflow(false);
-            gr.autoSysFields(false);
-            gr.u_processed = true;
-            gr.update();
-            batchCount++;
-        }
-        
-        totalUpdated += batchCount;
-        gs.info('Lote actualizado de ' + batchCount + ' registros. Total: ' + totalUpdated);
-        
-        // Evitar bucles infinitos en caso de que los criterios de consulta no cambien
-        if (batchCount < BATCH_SIZE) {
-            recordsLeft = false;
-        }
+    var batchCount = 0;
+    if (!gr.hasNext()) {
+        recordsLeft = false;
+        break;
     }
-    gs.info('Migración completada. Total actualizado: ' + totalUpdated);
-})();
+    
+    while (gr.next()) {
+        gr.setWorkflow(false);
+        gr.autoSysFields(false);
+        gr.u_processed = true;
+        gr.update();
+        batchCount++;
+    }
+    
+    totalUpdated += batchCount;
+    gs.info('Lote actualizado de ' + batchCount + ' registros. Total: ' + totalUpdated);
+    
+    // Evitar bucles infinitos en caso de que los criterios de consulta no cambien
+    if (batchCount < BATCH_SIZE) {
+        recordsLeft = false;
+    }
+}
+gs.info('Migración completada. Total actualizado: ' + totalUpdated);
 ```
 
 ---
@@ -130,17 +126,15 @@ Cuando necesite actualizar una sola columna al mismo valor en millones de regist
 > ⚠️ **Precaución:** Esta API no está documentada y solo debe usarse en scripts con ámbito (scoped) o globales cuando se requiera el máximo rendimiento. Omite todos los flujos de trabajo y campos del sistema automáticamente.
 
 ```javascript
-(function() {
-    var targetTable = 'incident';
-    var mu = new GlideMultipleUpdate(targetTable);
-    mu.addQuery('active', 'true');
-    mu.addQuery('priority', '1');
-    mu.setValue('work_notes', 'Actualización masiva ejecutada a través de GlideMultipleUpdate.');
-    
-    gs.info('Ejecutando actualización masiva de base de datos...');
-    mu.execute();
-    gs.info('Actualización masiva completada con éxito.');
-})();
+var targetTable = 'incident';
+var mu = new GlideMultipleUpdate(targetTable);
+mu.addQuery('active', 'true');
+mu.addQuery('priority', '1');
+mu.setValue('work_notes', 'Actualización masiva ejecutada a través de GlideMultipleUpdate.');
+
+gs.info('Ejecutando actualización masiva de base de datos...');
+mu.execute();
+gs.info('Actualización masiva completada con éxito.');
 ```
 
 ---
