@@ -47,31 +47,29 @@ This repository outlines standard templates and best practices to ensure safe, p
 Use this template to update records safely with a built-in dry-run preview mode.
 
 ```javascript
-(function() {
-    var dryRun = true; // Set to false to apply changes
-    var targetTable = 'incident';
-    var encodedQuery = 'active=true^state=3'; // On Hold incidents
-    
-    var gr = new GlideRecord(targetTable);
-    gr.addEncodedQuery(encodedQuery);
-    gr.query();
-    
-    var count = 0;
-    gs.info('Starting Fix Script. Dry Run: ' + dryRun);
-    
-    while (gr.next()) {
-        count++;
-        if (!dryRun) {
-            gr.setWorkflow(false);
-            gr.autoSysFields(false);
-            gr.work_notes = "System maintenance: Updated On Hold state comments.";
-            gr.update();
-        } else {
-            gs.info('[DRY RUN] Would update incident: ' + gr.number);
-        }
+var dryRun = true; // Set to false to apply changes
+var targetTable = 'incident';
+var encodedQuery = 'active=true^state=3'; // On Hold incidents
+
+var gr = new GlideRecord(targetTable);
+gr.addEncodedQuery(encodedQuery);
+gr.query();
+
+var count = 0;
+gs.info('Starting Fix Script. Dry Run: ' + dryRun);
+
+while (gr.next()) {
+    count++;
+    if (!dryRun) {
+        gr.setWorkflow(false);
+        gr.autoSysFields(false);
+        gr.work_notes = "System maintenance: Updated On Hold state comments.";
+        gr.update();
+    } else {
+        gs.info('[DRY RUN] Would update incident: ' + gr.number);
     }
-    gs.info('Completed execution. Affected records: ' + count);
-})();
+}
+gs.info('Completed execution. Affected records: ' + count);
 ```
 
 ---
@@ -81,44 +79,42 @@ Use this template to update records safely with a built-in dry-run preview mode.
 For large datasets, use this loop to query and update records in batches, avoiding memory heap errors and transaction timeouts.
 
 ```javascript
-(function() {
-    var BATCH_SIZE = 5000;
-    var targetTable = 'u_custom_data';
-    var encodedQuery = 'u_processed=false';
+var BATCH_SIZE = 5000;
+var targetTable = 'u_custom_data';
+var encodedQuery = 'u_processed=false';
+
+var recordsLeft = true;
+var totalUpdated = 0;
+
+while (recordsLeft) {
+    var gr = new GlideRecord(targetTable);
+    gr.addEncodedQuery(encodedQuery);
+    gr.setLimit(BATCH_SIZE);
+    gr.query();
     
-    var recordsLeft = true;
-    var totalUpdated = 0;
-    
-    while (recordsLeft) {
-        var gr = new GlideRecord(targetTable);
-        gr.addEncodedQuery(encodedQuery);
-        gr.setLimit(BATCH_SIZE);
-        gr.query();
-        
-        var batchCount = 0;
-        if (!gr.hasNext()) {
-            recordsLeft = false;
-            break;
-        }
-        
-        while (gr.next()) {
-            gr.setWorkflow(false);
-            gr.autoSysFields(false);
-            gr.u_processed = true;
-            gr.update();
-            batchCount++;
-        }
-        
-        totalUpdated += batchCount;
-        gs.info('Updated batch of ' + batchCount + ' records. Total: ' + totalUpdated);
-        
-        // Prevent infinite loops in case query criteria doesn't change
-        if (batchCount < BATCH_SIZE) {
-            recordsLeft = false;
-        }
+    var batchCount = 0;
+    if (!gr.hasNext()) {
+        recordsLeft = false;
+        break;
     }
-    gs.info('Migration complete. Total updated: ' + totalUpdated);
-})();
+    
+    while (gr.next()) {
+        gr.setWorkflow(false);
+        gr.autoSysFields(false);
+        gr.u_processed = true;
+        gr.update();
+        batchCount++;
+    }
+    
+    totalUpdated += batchCount;
+    gs.info('Updated batch of ' + batchCount + ' records. Total: ' + totalUpdated);
+    
+    // Prevent infinite loops in case query criteria doesn't change
+    if (batchCount < BATCH_SIZE) {
+        recordsLeft = false;
+    }
+}
+gs.info('Migration complete. Total updated: ' + totalUpdated);
 ```
 
 ---
@@ -130,17 +126,15 @@ When you need to update a single column to the same value across millions of rec
 > ⚠️ **Caution:** This API is undocumented and should only be used in scoped or global scripts when maximum performance is required. It bypasses all workflows and system fields automatically.
 
 ```javascript
-(function() {
-    var targetTable = 'incident';
-    var mu = new GlideMultipleUpdate(targetTable);
-    mu.addQuery('active', 'true');
-    mu.addQuery('priority', '1');
-    mu.setValue('work_notes', 'Critical mass update executed via GlideMultipleUpdate.');
-    
-    gs.info('Executing mass database update...');
-    mu.execute();
-    gs.info('Mass update completed successfully.');
-})();
+var targetTable = 'incident';
+var mu = new GlideMultipleUpdate(targetTable);
+mu.addQuery('active', 'true');
+mu.addQuery('priority', '1');
+mu.setValue('work_notes', 'Critical mass update executed via GlideMultipleUpdate.');
+
+gs.info('Executing mass database update...');
+mu.execute();
+gs.info('Mass update completed successfully.');
 ```
 
 ---
