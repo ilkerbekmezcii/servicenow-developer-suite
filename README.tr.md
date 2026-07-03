@@ -47,31 +47,29 @@ Bu depo, ServiceNow üzerinde güvenli, yüksek performanslı ve tekrarlanabilir
 Yerleşik bir kuru çalıştırma (dry-run) önizleme modu ile kayıtları güvenli bir şekilde güncellemek için bu şablonu kullanın.
 
 ```javascript
-(function() {
-    var dryRun = true; // Değişiklikleri uygulamak için false yapın
-    var targetTable = 'incident';
-    var encodedQuery = 'active=true^state=3'; // Beklemede (On Hold) olan olaylar
-    
-    var gr = new GlideRecord(targetTable);
-    gr.addEncodedQuery(encodedQuery);
-    gr.query();
-    
-    var count = 0;
-    gs.info('Fix Script Başlatıldı. Dry Run: ' + dryRun);
-    
-    while (gr.next()) {
-        count++;
-        if (!dryRun) {
-            gr.setWorkflow(false);
-            gr.autoSysFields(false);
-            gr.work_notes = "Sistem bakımı: Beklemede durum açıklamaları güncellendi.";
-            gr.update();
-        } else {
-            gs.info('[DRY RUN] Güncellenecek kayıt: ' + gr.number);
-        }
+var dryRun = true; // Değişiklikleri uygulamak için false yapın
+var targetTable = 'incident';
+var encodedQuery = 'active=true^state=3'; // Beklemede (On Hold) olan olaylar
+
+var gr = new GlideRecord(targetTable);
+gr.addEncodedQuery(encodedQuery);
+gr.query();
+
+var count = 0;
+gs.info('Fix Script Başlatıldı. Dry Run: ' + dryRun);
+
+while (gr.next()) {
+    count++;
+    if (!dryRun) {
+        gr.setWorkflow(false);
+        gr.autoSysFields(false);
+        gr.work_notes = "Sistem bakımı: Beklemede durum açıklamaları güncellendi.";
+        gr.update();
+    } else {
+        gs.info('[DRY RUN] Güncellenecek kayıt: ' + gr.number);
     }
-    gs.info('Yürütme tamamlandı. Etkilenen kayıt sayısı: ' + count);
-})();
+}
+gs.info('Yürütme tamamlandı. Etkilenen kayıt sayısı: ' + count);
 ```
 
 ---
@@ -81,44 +79,42 @@ Yerleşik bir kuru çalıştırma (dry-run) önizleme modu ile kayıtları güve
 Büyük veri kümeleri için, bellek yığını hatalarından ve işlem zaman aşımlarından kaçınmak amacıyla kayıtları paketler halinde sorgulamak ve güncellemek için bu döngüyü kullanın.
 
 ```javascript
-(function() {
-    var BATCH_SIZE = 5000;
-    var targetTable = 'u_custom_data';
-    var encodedQuery = 'u_processed=false';
+var BATCH_SIZE = 5000;
+var targetTable = 'u_custom_data';
+var encodedQuery = 'u_processed=false';
+
+var recordsLeft = true;
+var totalUpdated = 0;
+
+while (recordsLeft) {
+    var gr = new GlideRecord(targetTable);
+    gr.addEncodedQuery(encodedQuery);
+    gr.setLimit(BATCH_SIZE);
+    gr.query();
     
-    var recordsLeft = true;
-    var totalUpdated = 0;
-    
-    while (recordsLeft) {
-        var gr = new GlideRecord(targetTable);
-        gr.addEncodedQuery(encodedQuery);
-        gr.setLimit(BATCH_SIZE);
-        gr.query();
-        
-        var batchCount = 0;
-        if (!gr.hasNext()) {
-            recordsLeft = false;
-            break;
-        }
-        
-        while (gr.next()) {
-            gr.setWorkflow(false);
-            gr.autoSysFields(false);
-            gr.u_processed = true;
-            gr.update();
-            batchCount++;
-        }
-        
-        totalUpdated += batchCount;
-        gs.info(batchCount + ' adet kayıt güncellendi. Toplam: ' + totalUpdated);
-        
-        // Sorgu kriterinin değişmemesi durumunda sonsuz döngüyü önleme
-        if (batchCount < BATCH_SIZE) {
-            recordsLeft = false;
-        }
+    var batchCount = 0;
+    if (!gr.hasNext()) {
+        recordsLeft = false;
+        break;
     }
-    gs.info('Veri taşıma tamamlandı. Toplam güncellenen: ' + totalUpdated);
-})();
+    
+    while (gr.next()) {
+        gr.setWorkflow(false);
+        gr.autoSysFields(false);
+        gr.u_processed = true;
+        gr.update();
+        batchCount++;
+    }
+    
+    totalUpdated += batchCount;
+    gs.info(batchCount + ' adet kayıt güncellendi. Toplam: ' + totalUpdated);
+    
+    // Sorgu kriterinin değişmemesi durumunda sonsuz döngüyü önleme
+    if (batchCount < BATCH_SIZE) {
+        recordsLeft = false;
+    }
+}
+gs.info('Veri taşıma tamamlandı. Toplam güncellenen: ' + totalUpdated);
 ```
 
 ---
@@ -130,17 +126,15 @@ Milyonlarca kayıtta tek bir sütunu aynı değere güncellemeniz gerektiğinde,
 > ⚠️ **Dikkat:** Bu API belgelenmemiştir ve yalnızca maksimum performans gerektiğinde kapsamlı (scoped) veya global komut dosyalarında kullanılmalıdır. Tüm iş akışlarını ve sistem alanlarını otomatik olarak atlar.
 
 ```javascript
-(function() {
-    var targetTable = 'incident';
-    var mu = new GlideMultipleUpdate(targetTable);
-    mu.addQuery('active', 'true');
-    mu.addQuery('priority', '1');
-    mu.setValue('work_notes', 'GlideMultipleUpdate aracılığıyla toplu güncelleme yürütüldü.');
-    
-    gs.info('Veritabanında toplu güncelleme yürütülüyor...');
-    mu.execute();
-    gs.info('Toplu güncelleme başarıyla tamamlandı.');
-})();
+var targetTable = 'incident';
+var mu = new GlideMultipleUpdate(targetTable);
+mu.addQuery('active', 'true');
+mu.addQuery('priority', '1');
+mu.setValue('work_notes', 'GlideMultipleUpdate aracılığıyla toplu güncelleme yürütüldü.');
+
+gs.info('Veritabanında toplu güncelleme yürütülüyor...');
+mu.execute();
+gs.info('Toplu güncelleme başarıyla tamamlandı.');
 ```
 
 ---
